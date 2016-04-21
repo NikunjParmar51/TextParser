@@ -1,0 +1,287 @@
+﻿@model FileOperationApp.Views.TextParser.TextParserViewModel
+
+@{
+    ViewBag.Title = "Index";
+}
+
+<h2>Text Parser</h2>
+<style>
+    .redfont {
+        color: red;
+    }
+
+    #loading {
+        width: 100%;
+        height: 100%;
+        top: 0px;
+        left: 0px;
+        position: fixed;
+        display: block;
+        opacity: 0.7;
+        background-color: #fff;
+        z-index: 99;
+        text-align: center;
+    }
+
+    #loading-image {
+        position: absolute;
+        top: 260px;
+        left: 600px;
+        z-index: 100;
+    }
+</style>
+
+<div id="loading">
+    <img id="loading-image" src="~/Content/Image/ajax-loader.gif" alt="Loading..." />    
+</div>
+
+    <div style="width:100%">
+        <table style="width:100%">
+            <tr>
+                <td style="vertical-align:top;" >
+                    Upload file:
+                </td>
+                <td>
+                    @*@using (Html.BeginForm("Index", "TextParser", FormMethod.Post, new { enctype = "multipart/form-data" }))
+                    {*@
+
+@using (Html.BeginForm("Index", "TextParser", FormMethod.Post, new { id = "fileuploadform", enctype = "multipart/form-data", onsubmit = "return Validate();" }))
+{
+                        <input type="file" name="file" id="file" />
+                        <div>
+                            <input type="submit" value="Upload" />
+                        </div>
+
+                        <div id="FileMessage" style="color:red;"></div>
+                        @*<span>@Html.ValidationMessageFor(m => m.file, "", new { @class = "redfont"})</span>*@
+                    }
+                </td>
+            </tr>
+
+            <tr>
+                <td colspan="2">
+                    <table>
+                        <tr>
+                            <td colspan="2">
+                                &nbsp;
+
+                                @if (TempData["Success"] != null)
+                                {
+                                    <p id="filesuccess" style="color:red;">@TempData["Success"]</p>
+                                    TempData["Success"] = null;
+                                }
+                            </td>
+                        </tr>
+                        <tr>
+                            <th align="center">
+                                Files
+                            </th>
+                        </tr>
+
+
+                        @foreach (string item in ViewBag.directoryFiles)
+                        {
+                            <tr>
+                                <td>
+                                    @*@Html.RadioButton("rbgFile", Path.GetFileName(item), false, htmlAttributes: new { onclick = "getFileContent('" + Path.GetFileName(item) + "')" })*@
+                                    @Html.RadioButton("rbgFile", Path.GetFileName(item), false, htmlAttributes: new { onclick = "showContent('" + Path.GetFileName(item) + "', false)" })
+                                </td>
+
+                                <td>
+                                    @Path.GetFileName(item)
+                                </td>
+                            </tr>
+                        }
+                        <tr>
+                            <th>
+                                &nbsp;
+                            </th>
+                        </tr>
+
+                    </table>
+                </td>
+            </tr>
+            <tr>
+                <td style="vertical-align:top;">
+                    Content :
+                </td>
+                <td>
+                    @Html.TextAreaFor(model => model.Content, 10, 150, null)
+                </td>
+            </tr>
+            <tr>
+                <td style="vertical-align:top;">
+                    Command :
+                </td>
+                <td>
+                    @Html.TextAreaFor(model => model.Command, 5, 150, null)
+
+                    <div><input type="submit" value="Execute Command" id="btnSubmitCommand" style="display:none;" /></div>
+                </td>
+            </tr>
+
+            <tr>
+                <td>
+                    &nbsp;
+                </td>
+                <td>
+                    <div id="msg" style="color:red;display:none"></div>
+                </td>
+            </tr>
+
+            <tr>
+                <td style="vertical-align:top;">
+                    Filtered Content :
+                </td>
+                <td>
+                    @Html.TextArea("NewContent", string.Empty, 10, 150, null)
+                </td>
+            </tr>
+
+        </table>
+    </div>
+
+    <script src="~/scripts/jquery-1.10.2.js"></script>
+    <script>
+        function getFileContent(fileName, startingLine, endingLine, TotalLines, isFilteredContent) {
+
+            $.ajax({
+                type: 'GET',
+                url: '/TextParser/GetContentFromFile',
+                cache: false,
+                data: { fileName: fileName, startingLine: startingLine, endingLine: endingLine },
+                success: function (content) {
+                    
+                    if (!isFilteredContent)
+                        $('#Content').val($('#Content').val() + content);
+                    else 
+                        $('#NewContent').val($('#NewContent').val() + content);
+                    
+                    if (endingLine < TotalLines) {
+                        var start = endingLine + 1;
+                        var end = (start + 5000 <= TotalLines) ? start + 5000 : TotalLines;
+
+                        getFileContent(fileName, start, end, TotalLines, isFilteredContent);
+                    }
+                    else {
+                        $("#loading").hide();
+                    }
+                    
+                },
+                error: function (request) {
+                    alert(request.responseText);
+                }
+            });
+
+        }
+
+        function ShowContentBySequence(fileName, TotalLines, isFilteredContent)
+        {
+            if (TotalLines > 0) {
+                var start = 1;
+                var end = (start + 5000 <= TotalLines) ? start + 5000 : TotalLines;
+
+                getFileContent(fileName, start, end, TotalLines, isFilteredContent);
+            }
+        
+        }
+
+        function AppendContent(content) {
+            $('#content').text($('#content').text() + content);
+        }
+
+        function showContent(fileName, isFilteredContent) {
+            $.ajax({
+                type: 'GET',
+                url: '/TextParser/GetFileTotalLines',
+                cache: false,
+                data: { fileName: fileName },
+                success: function (response) {
+                    var TotalLines = parseInt(response);
+                    var LastIndex = 0;
+
+                    if (!isFilteredContent) {
+                        $('#Content').val("");
+
+                        $("#loading").show();
+                        ShowContentBySequence(fileName, TotalLines, isFilteredContent);
+                        
+
+                        $('#btnSubmitCommand').show();
+                    }
+                    else {
+                        $('#NewContent').val("");
+
+                        $("#loading").show();
+                        ShowContentBySequence(fileName, TotalLines, isFilteredContent);
+                        
+                    }
+                    
+                },
+            });
+        }
+
+        function getNewContent(commandText) {
+            $.ajax({
+                type: 'POST',
+                url: '/TextParser/SubmitCommand',
+                cache: false,
+                data: { fileName: $("input:radio[name=rbgFile]:checked").val(), commandText: commandText },
+                success: function (object) {
+                    
+                    $("#msg").html('');
+                    $("#msg").hide();
+
+                    var isAllFailed = true;
+                    //$(object.fileOutputResultList).each(function (i, obj) {
+                    $(object).each(function (i, obj) {
+                        if (!obj.isValid) {
+                            $("#msg").html($("#msg").html() + obj.message + "<br />").show();
+                        }
+                        else
+                        {
+                            isAllFailed = false;                            
+                        }
+                    });
+
+                    if (!isAllFailed)
+                        showContent($("input:radio[name=rbgFile]:checked").val(), true);
+                },
+            });
+        }
+
+        $(function () {
+            $("#btnSubmitCommand").click(function () {
+                if ($('#Command').val().trim() == "") {
+                    $("#msg").html("Please enter at least one command").show();
+                }
+                else
+                {
+                    $("#msg").html("").hide();
+                    $("#loading").hide();
+                    getNewContent($('#Command').val());
+                }                
+            });
+
+            //document.getElementById("file").required = true;
+        });
+
+        function Validate() {
+            $("#filesuccess").html("");
+
+            var ext = $('#file').val().split('.').pop().toLowerCase();
+            if ($.inArray(ext, ['txt']) == -1) {
+                $("#FileMessage").html("Please enter file having .txt extension");
+                
+                return false;
+            }
+            else {
+                $("#FileMessage").html("");
+                return true;
+            }
+        }
+
+        $(function () {
+            $("#loading").hide();
+        });
+    </script>
